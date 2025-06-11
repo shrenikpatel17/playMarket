@@ -1,14 +1,63 @@
 import { User, Market, Order, Trade, OrderBook, MarketData } from '@/types/market';
 
-// Generate mock users
-export const generateUsers = (): User[] => {
+// Generate mock users with beliefs and trading characteristics
+export const generateUsers = (markets: Market[] = []): User[] => {
   const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
-  return names.map((name, index) => ({
-    id: `user-${index + 1}`,
-    name,
-    balance: Math.floor(Math.random() * 10000) + 5000,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
-  }));
+  const tradingStyles: ('conservative' | 'moderate' | 'aggressive')[] = ['conservative', 'moderate', 'aggressive'];
+  
+  return names.map((name, index) => {
+    // Generate beliefs for each market with much more diversity
+    const beliefs: Record<string, number> = {};
+    markets.forEach((market, marketIndex) => {
+      // Create distinct user archetypes with very different beliefs
+      let baseBelief: number;
+      
+      switch (index % 5) {
+        case 0: // Very optimistic users
+          baseBelief = 0.75 + Math.random() * 0.2; // 75-95%
+          break;
+        case 1: // Very pessimistic users  
+          baseBelief = 0.05 + Math.random() * 0.2; // 5-25%
+          break;
+        case 2: // Moderate optimistic
+          baseBelief = 0.55 + Math.random() * 0.2; // 55-75%
+          break;
+        case 3: // Moderate pessimistic
+          baseBelief = 0.25 + Math.random() * 0.2; // 25-45%
+          break;
+        case 4: // Neutral with slight variation
+          baseBelief = 0.45 + Math.random() * 0.1; // 45-55%
+          break;
+        default:
+          baseBelief = 0.5;
+      }
+      
+      // Add some market-specific variation
+      const marketVariation = (Math.sin(marketIndex + index) * 0.15); // -15% to +15%
+      baseBelief = Math.max(0.05, Math.min(0.95, baseBelief + marketVariation));
+      
+      beliefs[market.id] = Math.round(baseBelief * 100) / 100;
+    });
+
+    const riskTolerance = Math.random(); // 0-1
+    const tradingStyle = tradingStyles[index % 3];
+    const baseBalance = Math.floor(Math.random() * 10000) + 5000;
+    
+    // Max order size based on balance and risk tolerance
+    const maxOrderSize = Math.floor(baseBalance * (0.05 + riskTolerance * 0.25)); // 5-30% of balance
+    
+    return {
+      id: `user-${index + 1}`,
+      name,
+      balance: baseBalance,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+      beliefs,
+      riskTolerance,
+      tradingStyle,
+      maxOrderSize,
+      confidenceLevel: 0.4 + Math.random() * 0.5 // 40-90% confidence
+    };
+  });
 };
 
 // Generate mock markets
@@ -46,7 +95,110 @@ export const generateMarkets = (): Market[] => {
   });
 };
 
-// Generate random order
+// Generate intelligent order based on user beliefs and market analysis
+export const generateIntelligentOrder = (users: User[], markets: Market[]): Order | null => {
+  // Select a random user
+  const user = users[Math.floor(Math.random() * users.length)];
+  
+  // Find markets where user has strong opinions (belief differs significantly from market price)
+  const opportunities = markets.map(market => {
+    const userBelief = user.beliefs[market.id] || 0.5;
+    const marketImpliedProb = market.yesPrice; // Market price implies probability
+    
+    // Calculate expected value for YES and NO positions
+    const yesExpectedValue = userBelief - market.yesPrice; // Profit if user is right about YES
+    const noExpectedValue = (1 - userBelief) - market.noPrice; // Profit if user is right about NO
+    
+    return {
+      market,
+      userBelief,
+      marketImpliedProb,
+      yesExpectedValue,
+      noExpectedValue,
+      maxExpectedValue: Math.max(yesExpectedValue, noExpectedValue),
+      bestSide: yesExpectedValue > noExpectedValue ? 'YES' : 'NO'
+    };
+  }).filter(opp => Math.abs(opp.maxExpectedValue) > 0.02); // Lower threshold for trading (2% edge)
+
+  // If no opportunities, sometimes don't trade, but be more willing to trade
+  if (opportunities.length === 0 || Math.random() > (user.riskTolerance * 0.8 + 0.2)) {
+    return null;
+  }
+
+  // Sort by expected value and confidence
+  opportunities.sort((a, b) => Math.abs(b.maxExpectedValue) * user.confidenceLevel - Math.abs(a.maxExpectedValue) * user.confidenceLevel);
+  
+  const selectedOpportunity = opportunities[0];
+  const market = selectedOpportunity.market;
+  const side = selectedOpportunity.bestSide as 'YES' | 'NO';
+  
+  // Determine if buying or selling based on user's belief vs market price
+  let type: 'BUY' | 'SELL';
+  let targetPrice: number;
+  
+  if (side === 'YES') {
+    if (selectedOpportunity.userBelief > selectedOpportunity.marketImpliedProb) {
+      // User thinks YES is underpriced, so BUY YES
+      type = 'BUY';
+      // Be more aggressive with pricing to ensure trades happen
+      const maxWillingToPay = Math.min(0.95, selectedOpportunity.userBelief * (0.8 + user.confidenceLevel * 0.2));
+      targetPrice = market.yesPrice + (maxWillingToPay - market.yesPrice) * 0.7; // More aggressive
+    } else {
+      // User thinks YES is overpriced, so SELL YES
+      type = 'SELL';
+      // Be more aggressive with pricing
+      const minWillingToSell = Math.max(0.05, selectedOpportunity.userBelief * (1.2 - user.confidenceLevel * 0.2));
+      targetPrice = Math.max(market.yesPrice * 0.95, minWillingToSell); // Slightly below market
+    }
+  } else {
+    // Similar logic for NO
+    if ((1 - selectedOpportunity.userBelief) > market.noPrice) {
+      type = 'BUY';
+      const maxWillingToPay = Math.min(0.95, (1 - selectedOpportunity.userBelief) * (0.8 + user.confidenceLevel * 0.2));
+      targetPrice = market.noPrice + (maxWillingToPay - market.noPrice) * 0.7;
+    } else {
+      type = 'SELL';
+      const minWillingToSell = Math.max(0.05, (1 - selectedOpportunity.userBelief) * (1.2 - user.confidenceLevel * 0.2));
+      targetPrice = Math.max(market.noPrice * 0.95, minWillingToSell);
+    }
+  }
+
+  // Ensure price is within bounds
+  targetPrice = Math.max(0.01, Math.min(0.99, targetPrice));
+
+  // Calculate order size based on confidence, risk tolerance, and expected value
+  const baseOrderSize = user.maxOrderSize * user.confidenceLevel * Math.abs(selectedOpportunity.maxExpectedValue) * 2; // More aggressive sizing
+  let orderSize: number;
+  
+  switch (user.tradingStyle) {
+    case 'conservative':
+      orderSize = Math.floor(baseOrderSize * 0.6);
+      break;
+    case 'moderate':
+      orderSize = Math.floor(baseOrderSize * 0.8);
+      break;
+    case 'aggressive':
+      orderSize = Math.floor(baseOrderSize * 1.2);
+      break;
+  }
+
+  // Ensure reasonable order size and don't exceed balance
+  orderSize = Math.max(100, Math.min(orderSize, user.balance * 0.5)); // Increased max to 50% of balance
+
+  return {
+    id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: user.id,
+    marketId: market.id,
+    side,
+    type,
+    price: Math.round(targetPrice * 100) / 100,
+    amount: orderSize,
+    timestamp: new Date(),
+    status: 'PENDING'
+  };
+};
+
+// Keep the old function for backward compatibility, but mark as deprecated
 export const generateRandomOrder = (users: User[], markets: Market[]): Order => {
   const user = users[Math.floor(Math.random() * users.length)];
   const market = markets[Math.floor(Math.random() * markets.length)];
@@ -226,4 +378,110 @@ export const createOrderBook = (orders: Order[], marketId: string): OrderBook =>
     noBids: marketOrders.filter(o => o.side === 'NO' && o.type === 'BUY').sort((a, b) => b.price - a.price),
     noAsks: marketOrders.filter(o => o.side === 'NO' && o.type === 'SELL').sort((a, b) => a.price - b.price)
   };
+};
+
+// Update user beliefs based on market movements and new information
+export const updateUserBeliefs = (users: User[], markets: Market[], recentTrades: Trade[]): User[] => {
+  return users.map(user => {
+    const updatedBeliefs = { ...user.beliefs };
+    
+    markets.forEach(market => {
+      const currentBelief = user.beliefs[market.id] || 0.5;
+      const marketPrice = market.yesPrice;
+      
+      // Users slowly adjust their beliefs toward market consensus, but maintain some independence
+      const marketInfluence = 0.05; // 5% adjustment toward market price each update
+      const personalityFactor = user.confidenceLevel; // More confident users resist market influence
+      
+      // Calculate how much to adjust belief toward market price
+      const adjustment = (marketPrice - currentBelief) * marketInfluence * (1 - personalityFactor);
+      
+      // Add some random noise based on "new information"
+      const randomNoise = (Math.random() - 0.5) * 0.02; // ±1% random adjustment
+      
+      // Update belief
+      let newBelief = currentBelief + adjustment + randomNoise;
+      
+      // Keep beliefs within reasonable bounds
+      newBelief = Math.max(0.05, Math.min(0.95, newBelief));
+      
+      updatedBeliefs[market.id] = newBelief;
+    });
+    
+    return {
+      ...user,
+      beliefs: updatedBeliefs
+    };
+  });
+};
+
+// Generate market maker orders to provide liquidity
+export const generateMarketMakerOrder = (users: User[], markets: Market[]): Order | null => {
+  // Select a user to act as market maker (prefer users with higher balances)
+  const sortedUsers = users.sort((a, b) => b.balance - a.balance);
+  const marketMaker = sortedUsers[Math.floor(Math.random() * Math.min(3, sortedUsers.length))]; // Top 3 users
+  
+  const market = markets[Math.floor(Math.random() * markets.length)];
+  const side = Math.random() > 0.5 ? 'YES' : 'NO';
+  
+  // Market makers provide liquidity by placing orders slightly away from current market price
+  const currentPrice = side === 'YES' ? market.yesPrice : market.noPrice;
+  const spread = 0.02 + Math.random() * 0.03; // 2-5% spread
+  
+  let type: 'BUY' | 'SELL';
+  let price: number;
+  
+  if (Math.random() > 0.5) {
+    // Place a buy order below market price
+    type = 'BUY';
+    price = Math.max(0.01, currentPrice - spread);
+  } else {
+    // Place a sell order above market price
+    type = 'SELL';
+    price = Math.min(0.99, currentPrice + spread);
+  }
+  
+  // Market makers use smaller, consistent order sizes
+  const orderSize = Math.floor(marketMaker.balance * 0.02) + 200; // 2% of balance + base amount
+  
+  return {
+    id: `mm-order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: marketMaker.id,
+    marketId: market.id,
+    side,
+    type,
+    price: Math.round(price * 100) / 100,
+    amount: Math.min(orderSize, marketMaker.balance * 0.1),
+    timestamp: new Date(),
+    status: 'PENDING'
+  };
+};
+
+// Debug function to log order and trade information
+export const logMarketActivity = (orders: Order[], trades: Trade[], users: User[]) => {
+  const pendingOrders = orders.filter(o => o.status === 'PENDING');
+  const recentTrades = trades.slice(-5); // Last 5 trades
+  
+  console.log('=== Market Activity Debug ===');
+  console.log(`Pending Orders: ${pendingOrders.length}`);
+  console.log(`Total Trades: ${trades.length}`);
+  
+  if (pendingOrders.length > 0) {
+    console.log('Sample Pending Orders:');
+    pendingOrders.slice(0, 3).forEach(order => {
+      const user = users.find(u => u.id === order.userId);
+      console.log(`  ${user?.name}: ${order.type} ${order.side} at $${order.price} (${order.amount} shares)`);
+    });
+  }
+  
+  if (recentTrades.length > 0) {
+    console.log('Recent Trades:');
+    recentTrades.forEach(trade => {
+      const buyer = users.find(u => u.id === trade.buyerId);
+      const seller = users.find(u => u.id === trade.sellerId);
+      console.log(`  ${buyer?.name} bought ${trade.side} from ${seller?.name} at $${trade.price} (${trade.amount} shares)`);
+    });
+  }
+  
+  console.log('========================');
 }; 

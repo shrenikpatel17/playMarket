@@ -3,6 +3,11 @@ export interface User {
   name: string;
   balance: number;
   avatar: string;
+  beliefs: Record<string, number>; // marketId -> belief probability (0-1)
+  riskTolerance: number; // 0-1, higher = more willing to take risks
+  tradingStyle: 'conservative' | 'moderate' | 'aggressive';
+  maxOrderSize: number; // Maximum amount willing to trade in single order
+  confidenceLevel: number; // 0-1, how confident they are in their beliefs
 }
 
 export interface Market {

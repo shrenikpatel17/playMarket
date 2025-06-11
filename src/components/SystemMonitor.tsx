@@ -218,13 +218,15 @@ export default function SystemMonitor({ orders, trades, markets, isSimulationRun
       {/* System explanation */}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
         <div className="text-xs text-gray-600 dark:text-gray-400">
-          <div className="font-medium mb-1">How the Trading Engine Works:</div>
+          <div className="font-medium mb-1">How the Intelligent Trading Engine Works:</div>
           <div className="space-y-1">
-            <div>• Orders are generated randomly every 1-3 seconds when simulation is running</div>
-            <div>• Matching engine uses price-time priority: highest buy price matches lowest sell price</div>
-            <div>• Trade price is set as midpoint between matched buy and sell orders</div>
-            <div>• Market prices update based on order book spreads: mean of highest buy and lowest sell</div>
-            <div>• System maintains order book depth and tracks all trading activity</div>
+            <div>• <strong>User Beliefs:</strong> Each trader has personal beliefs about market outcomes (5-95% probability)</div>
+            <div>• <strong>Rational Orders:</strong> Users only trade when they see profitable opportunities vs their beliefs</div>
+            <div>• <strong>Market Makers:</strong> 30% of orders provide liquidity with bid-ask spreads</div>
+            <div>• <strong>Risk Management:</strong> Order sizes based on confidence, risk tolerance, and expected value</div>
+            <div>• <strong>Belief Evolution:</strong> User beliefs slowly adjust toward market consensus over time</div>
+            <div>• <strong>Price Discovery:</strong> Market prices update based on order book depth and recent trades</div>
+            <div>• <strong>Trading Styles:</strong> Conservative, moderate, and aggressive traders with different behaviors</div>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 # PolyMarket Simulation
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app). It simulates a real-time prediction market where users can trade on various market questions.
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app). It simulates a sophisticated prediction market where intelligent traders with personal beliefs compete to find profitable opportunities.
 
 ## Getting Started
 
@@ -22,11 +22,52 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 ## Features
 
-- **Real-time Trading Simulation**: Users can place buy and sell orders on various market questions.
-- **Market Questions**: Users can trade on questions like "Will Bitcoin reach $100,000 by the end of 2024?" and "Will SpaceX land humans on Mars by 2030?"
-- **Order Matching**: The application includes a simple order matching engine that processes trades based on user orders.
-- **Market Price Updates**: Prices for each market are updated based on the order book and recent trades.
-- **User Management**: The simulation generates mock users with random balances and avatars.
+### 🧠 Intelligent Trading System
+
+- **Personal Beliefs**: Each trader has unique beliefs about market outcomes (5-95% probability)
+- **Rational Decision Making**: Users only trade when they identify profitable opportunities
+- **Risk Management**: Order sizes determined by confidence levels, risk tolerance, and expected value
+- **Trading Personalities**: Conservative, moderate, and aggressive trading styles with different behaviors
+
+### 📊 Market Dynamics
+
+- **Diverse User Archetypes**: Very optimistic, pessimistic, moderate, and neutral traders create market tension
+- **Market Makers**: 30% of orders provide liquidity with bid-ask spreads to ensure tradability
+- **Belief Evolution**: User beliefs slowly adjust toward market consensus while maintaining independence
+- **Price Discovery**: Real-time price updates based on order book depth and trading activity
+
+### 🎯 Prediction Markets
+
+- **Market Questions**: Trade on questions like "Will Bitcoin reach $100,000 by end of 2024?" and "Will SpaceX land humans on Mars by 2030?"
+- **Binary Outcomes**: YES/NO shares that sum to $1.00, representing probability
+- **Order Matching**: Sophisticated engine matches buyers and sellers based on price-time priority
+- **Real-time Analytics**: Live order books, trade history, and price charts
+
+### 🔧 Technical Features
+
+- **Order Book Management**: Full depth tracking with bid/ask spreads
+- **Trade Execution**: Automatic matching when buy price ≥ sell price
+- **System Monitoring**: Real-time event logging and performance metrics
+- **Responsive UI**: Modern interface with dark mode support
+
+## How It Works
+
+1. **User Generation**: 10 traders with diverse beliefs, risk tolerances, and trading styles
+2. **Market Analysis**: Users continuously evaluate markets for profitable opportunities
+3. **Order Placement**: Intelligent orders based on belief vs market price discrepancies
+4. **Market Making**: Liquidity providers place orders around current prices
+5. **Order Matching**: Engine matches compatible orders and executes trades
+6. **Price Updates**: Market prices adjust based on order book and recent trades
+7. **Belief Updates**: User beliefs evolve slowly based on market movements
+
+## Educational Value
+
+This simulation demonstrates key concepts in:
+
+- **Prediction Market Theory**: How markets aggregate information and discover prices
+- **Behavioral Finance**: Different trader personalities and decision-making processes
+- **Market Microstructure**: Order books, spreads, and liquidity provision
+- **Information Efficiency**: How diverse beliefs lead to price discovery
 
 ## Learn More
 

@@ -5,10 +5,13 @@ import { User, Market, Order, Trade, OrderBook as OrderBookType } from '@/types/
 import { 
   generateUsers, 
   generateMarkets, 
-  generateRandomOrder, 
+  generateIntelligentOrder,
+  generateMarketMakerOrder,
   matchOrders, 
   updateMarketPrices, 
-  createOrderBook 
+  createOrderBook,
+  updateUserBeliefs,
+  logMarketActivity
 } from '@/utils/marketSimulation';
 import MarketCard from '@/components/MarketCard';
 import OrderBook from '@/components/OrderBook';
@@ -28,18 +31,32 @@ export default function Home() {
 
   // Initialize data
   useEffect(() => {
-    const initialUsers = generateUsers();
     const initialMarkets = generateMarkets();
+    const initialUsers = generateUsers(initialMarkets); // Pass markets to generate beliefs
     
     setUsers(initialUsers);
     setMarkets(initialMarkets);
     setSelectedMarketId(initialMarkets[0]?.id || '');
     
-    // Generate some initial orders
+    // Generate some initial intelligent orders and market maker orders
     const initialOrders: Order[] = [];
-    for (let i = 0; i < 20; i++) {
-      initialOrders.push(generateRandomOrder(initialUsers, initialMarkets));
+    
+    // Generate 15 intelligent orders
+    for (let i = 0; i < 15; i++) {
+      const order = generateIntelligentOrder(initialUsers, initialMarkets);
+      if (order) {
+        initialOrders.push(order);
+      }
     }
+    
+    // Generate 10 market maker orders for liquidity
+    for (let i = 0; i < 10; i++) {
+      const order = generateMarketMakerOrder(initialUsers, initialMarkets);
+      if (order) {
+        initialOrders.push(order);
+      }
+    }
+    
     setOrders(initialOrders);
   }, []);
 
@@ -48,12 +65,26 @@ export default function Home() {
     if (!isSimulationRunning || users.length === 0 || markets.length === 0) return;
 
     const interval = setInterval(() => {
-      // Generate 1-3 new random orders
-      const newOrdersCount = Math.floor(Math.random() * 3) + 1;
+      // Generate mix of intelligent orders and market maker orders
       const newOrders: Order[] = [];
       
-      for (let i = 0; i < newOrdersCount; i++) {
-        newOrders.push(generateRandomOrder(users, markets));
+      // 70% intelligent orders, 30% market maker orders
+      const orderCount = Math.floor(Math.random() * 3) + 2; // 2-4 orders per cycle
+      
+      for (let i = 0; i < orderCount; i++) {
+        let order: Order | null = null;
+        
+        if (Math.random() < 0.7) {
+          // Generate intelligent order
+          order = generateIntelligentOrder(users, markets);
+        } else {
+          // Generate market maker order
+          order = generateMarketMakerOrder(users, markets);
+        }
+        
+        if (order) {
+          newOrders.push(order);
+        }
       }
 
       setOrders(prevOrders => {
@@ -69,13 +100,25 @@ export default function Home() {
           setMarkets(prevMarkets => 
             prevMarkets.map(market => updateMarketPrices(market, newTrades, updatedOrders))
           );
+          
+          // Update user beliefs based on market movements
+          setUsers(prevUsers => updateUserBeliefs(prevUsers, markets, newTrades));
+          
+          // Log successful trades
+          console.log(`✅ ${newTrades.length} new trades executed!`);
         }
         
         const pendingOrders = updatedOrders.filter(o => o.status === 'PENDING');
         const filledOrders = updatedOrders.filter(o => o.status === 'FILLED');
+        
+        // Debug logging every 10 cycles
+        if (Math.random() < 0.1) {
+          logMarketActivity([...pendingOrders, ...filledOrders], trades, users);
+        }
+        
         return [...pendingOrders, ...filledOrders];
       });
-    }, 250); // Execute every 0.25 second
+    }, 500); // Slow down to 0.5 seconds to see trades better
 
     return () => clearInterval(interval);
   }, [isSimulationRunning, users, markets]);
@@ -93,9 +136,11 @@ export default function Home() {
     setOrders([]);
     setTrades([]);
     
-    // Reset market prices
+    // Reset market prices and regenerate users with new beliefs
     const resetMarkets = generateMarkets();
+    const resetUsers = generateUsers(resetMarkets);
     setMarkets(resetMarkets);
+    setUsers(resetUsers);
     setSelectedMarketId(resetMarkets[0]?.id || '');
   };
 
