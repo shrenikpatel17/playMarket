@@ -1,103 +1,246 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { User, Market, Order, Trade, OrderBook as OrderBookType } from '@/types/market';
+import { 
+  generateUsers, 
+  generateMarkets, 
+  generateRandomOrder, 
+  matchOrders, 
+  updateMarketPrices, 
+  createOrderBook 
+} from '@/utils/marketSimulation';
+import MarketCard from '@/components/MarketCard';
+import OrderBook from '@/components/OrderBook';
+import TradeHistory from '@/components/TradeHistory';
+import UserList from '@/components/UserList';
+import TradeExplanation from '@/components/TradeExplanation';
+import SystemMonitor from '@/components/SystemMonitor';
+import PriceChart from '@/components/PriceChart';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [users, setUsers] = useState<User[]>([]);
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [selectedMarketId, setSelectedMarketId] = useState<string>('');
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Initialize data
+  useEffect(() => {
+    const initialUsers = generateUsers();
+    const initialMarkets = generateMarkets();
+    
+    setUsers(initialUsers);
+    setMarkets(initialMarkets);
+    setSelectedMarketId(initialMarkets[0]?.id || '');
+    
+    // Generate some initial orders
+    const initialOrders: Order[] = [];
+    for (let i = 0; i < 20; i++) {
+      initialOrders.push(generateRandomOrder(initialUsers, initialMarkets));
+    }
+    setOrders(initialOrders);
+  }, []);
+
+  // Simulation loop
+  useEffect(() => {
+    if (!isSimulationRunning || users.length === 0 || markets.length === 0) return;
+
+    const interval = setInterval(() => {
+      // Generate 1-3 new random orders
+      const newOrdersCount = Math.floor(Math.random() * 3) + 1;
+      const newOrders: Order[] = [];
+      
+      for (let i = 0; i < newOrdersCount; i++) {
+        newOrders.push(generateRandomOrder(users, markets));
+      }
+
+      setOrders(prevOrders => {
+        const allOrders = [...prevOrders, ...newOrders];
+        
+        // Match orders and generate trades
+        const { trades: newTrades, updatedOrders } = matchOrders(allOrders);
+        
+        if (newTrades.length > 0) {
+          setTrades(prevTrades => [...prevTrades, ...newTrades]);
+          
+          // Update market prices based on new trades and current order book
+          setMarkets(prevMarkets => 
+            prevMarkets.map(market => updateMarketPrices(market, newTrades, updatedOrders))
+          );
+        }
+        
+        const pendingOrders = updatedOrders.filter(o => o.status === 'PENDING');
+        const filledOrders = updatedOrders.filter(o => o.status === 'FILLED');
+        return [...pendingOrders, ...filledOrders];
+      });
+    }, 250); // Execute every 0.25 second
+
+    return () => clearInterval(interval);
+  }, [isSimulationRunning, users, markets]);
+
+  const selectedMarket = markets.find(m => m.id === selectedMarketId);
+  const selectedOrderBook = selectedMarketId ? createOrderBook(orders, selectedMarketId) : null;
+  const selectedMarketTrades = trades.filter(t => t.marketId === selectedMarketId);
+
+  const toggleSimulation = () => {
+    setIsSimulationRunning(!isSimulationRunning);
+  };
+
+  const resetSimulation = () => {
+    setIsSimulationRunning(false);
+    setOrders([]);
+    setTrades([]);
+    
+    // Reset market prices
+    const resetMarkets = generateMarkets();
+    setMarkets(resetMarkets);
+    setSelectedMarketId(resetMarkets[0]?.id || '');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                PolyMarket Simulation
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Real-time prediction market trading simulation with detailed analysis
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={toggleSimulation}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isSimulationRunning
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {isSimulationRunning ? 'Stop Simulation' : 'Start Simulation'}
+              </button>
+              
+              <button
+                onClick={resetSimulation}
+                className="px-4 py-2 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 text-white transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+          
+          {/* Status indicators */}
+          <div className="flex items-center space-x-6 mt-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isSimulationRunning ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-gray-600 dark:text-gray-400">
+                Simulation {isSimulationRunning ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+            <span className="text-gray-600 dark:text-gray-400">
+              Total Orders: {orders.length} ({orders.filter(o => o.status === 'PENDING').length} pending)
+            </span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Total Trades: {trades.length}
+            </span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Active Markets: {markets.length}
+            </span>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Main content grid */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left sidebar - Markets and Users */}
+          <div className="col-span-3 space-y-6">
+            {/* Markets */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h2 className="font-semibold mb-4">Markets</h2>
+              <div className="space-y-3">
+                {markets.map(market => (
+                  <MarketCard
+                    key={market.id}
+                    market={market}
+                    isSelected={market.id === selectedMarketId}
+                    onClick={() => setSelectedMarketId(market.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Users */}
+            <UserList users={users} />
+          </div>
+
+          {/* Center - Market details, price chart, and order book */}
+          <div className="col-span-6">
+            {selectedMarket && (
+              <div className="space-y-6">
+                {/* Market details */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <h2 className="text-xl font-semibold mb-2">{selectedMarket.question}</h2>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">{selectedMarket.description}</p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">${selectedMarket.yesPrice.toFixed(2)}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">YES</div>
+                    </div>
+                    <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">${selectedMarket.noPrice.toFixed(2)}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">NO</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>Volume: ${selectedMarket.totalVolume.toLocaleString()}</span>
+                    <span>Ends: {selectedMarket.endDate.toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {/* Price Chart */}
+                <PriceChart market={selectedMarket} trades={selectedMarketTrades} />
+
+                {/* Order book */}
+                {selectedOrderBook && (
+                  <OrderBook orderBook={selectedOrderBook} users={users} />
+                )}
+
+                {/* Trade history */}
+                <TradeHistory trades={selectedMarketTrades} users={users} />
+              </div>
+            )}
+          </div>
+
+          {/* Right sidebar - Analysis and Monitoring */}
+          <div className="col-span-3 space-y-6">
+            {/* System Monitor */}
+            <SystemMonitor 
+              orders={orders}
+              trades={trades}
+              markets={markets}
+              isSimulationRunning={isSimulationRunning}
+            />
+          </div>
+        </div>
+
+        {/* Bottom section - Trade Analysis */}
+        <div className="mt-6">
+          <TradeExplanation 
+            trades={trades}
+            orders={orders}
+            users={users}
+            markets={markets}
+            isSimulationRunning={isSimulationRunning}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+      </div>
     </div>
   );
 }
