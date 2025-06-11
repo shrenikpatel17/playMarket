@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PolyMarket Simulation
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app). It simulates a real-time prediction market where users can trade on various market questions.
 
 ## Getting Started
 
@@ -18,7 +20,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
+
+- **Real-time Trading Simulation**: Users can place buy and sell orders on various market questions.
+- **Market Questions**: Users can trade on questions like "Will Bitcoin reach $100,000 by the end of 2024?" and "Will SpaceX land humans on Mars by 2030?"
+- **Order Matching**: The application includes a simple order matching engine that processes trades based on user orders.
+- **Market Price Updates**: Prices for each market are updated based on the order book and recent trades.
+- **User Management**: The simulation generates mock users with random balances and avatars.
 
 ## Learn More
 
